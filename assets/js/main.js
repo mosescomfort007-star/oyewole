@@ -1,22 +1,29 @@
 /**
- * LUXE LIVING — Global Application & Interaction Controller
- * Handles Revolution Slider, Cart Drawer, Quick View Modal, Consultation Booking,
- * Form Validation, WhatsApp Integration, and Toast Notifications.
+ * LUXE LIVING — Global Web App Application Controller
+ * Version: 2.0.0 (Web App Edition)
+ * Includes PWA Service Worker, Multi-Currency Engine, Wishlist State,
+ * Live Command Search (Cmd+K), Revolution Slider, Cart Drawer, and Customizer Integration.
  */
 
-// Global Configuration (Easily Editable)
+// Global Configuration & Currency Rates
 window.LuxeConfig = {
   brandName: "Luxe Living",
   phone: "+1 (800) 589-3548",
   phoneRaw: "18005893548",
-  whatsappNumber: "18005893548", // Editable WhatsApp Business Number
+  whatsappNumber: "18005893548",
   email: "concierge@luxeliving.com",
   showroomAddress: "740 Madison Avenue, New York, NY 10065",
   freeShippingThreshold: 5000,
-  currencySymbol: "$"
+  currentCurrency: localStorage.getItem('luxeliving_currency') || 'USD',
+  rates: {
+    USD: { rate: 1.0, symbol: '$', suffix: '' },
+    EUR: { rate: 0.92, symbol: '€', suffix: '' },
+    GBP: { rate: 0.79, symbol: '£', suffix: '' },
+    AED: { rate: 3.67, symbol: 'AED ', suffix: '' }
+  }
 };
 
-// Global Store / State
+// Global Reactive Web App State
 const LuxeState = {
   cart: JSON.parse(localStorage.getItem('luxeliving_cart')) || [
     {
@@ -27,6 +34,9 @@ const LuxeState = {
       qty: 1,
       image: 'assets/images/hero-slide-1.jpg'
     }
+  ],
+  wishlist: JSON.parse(localStorage.getItem('luxeliving_wishlist')) || [
+    'elysian-accent-chair'
   ],
   products: [
     {
@@ -156,8 +166,22 @@ const LuxeState = {
   ]
 };
 
-// Main Initialization
+// Global Currency Formatter
+window.formatCurrency = function(amountInUSD) {
+  const cur = LuxeConfig.currentCurrency || 'USD';
+  const info = LuxeConfig.rates[cur] || LuxeConfig.rates.USD;
+  const converted = Math.round(amountInUSD * info.rate);
+  return `${info.symbol}${converted.toLocaleString()}${info.suffix}`;
+};
+
+// App Initialization
 document.addEventListener('DOMContentLoaded', () => {
+  initServiceWorker();
+  initCurrencyEngine();
+  initWishlistEngine();
+  initCommandPalette();
+  initPWAInstallPrompt();
+  initOfflineDetector();
   initHeader();
   initHeroSlider();
   initCollectionsAndFilter();
@@ -167,7 +191,366 @@ document.addEventListener('DOMContentLoaded', () => {
   initWhatsAppButtons();
   initBackToTop();
   updateCartBadge();
+  updateWishlistBadge();
 });
+
+/* ==========================================================================
+   1. Progressive Web App (PWA) Service Worker Registration
+   ========================================================================== */
+function initServiceWorker() {
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('./sw.js')
+        .then((reg) => {
+          console.log('[Luxe Living App] Service Worker active, scope:', reg.scope);
+        })
+        .catch((err) => {
+          console.warn('[Luxe Living App] Service Worker registration failed:', err);
+        });
+    });
+  }
+}
+
+/* ==========================================================================
+   2. Multi-Currency Engine
+   ========================================================================== */
+function initCurrencyEngine() {
+  const currencySelector = document.getElementById('currencySelector');
+  if (currencySelector) {
+    currencySelector.value = LuxeConfig.currentCurrency;
+    currencySelector.addEventListener('change', (e) => {
+      LuxeConfig.currentCurrency = e.target.value;
+      localStorage.setItem('luxeliving_currency', LuxeConfig.currentCurrency);
+      updateAllPricesOnPage();
+      if (window.renderCartDrawer) window.renderCartDrawer();
+      if (window.renderWishlistDrawer) window.renderWishlistDrawer();
+      showToast(`Currency updated to ${LuxeConfig.currentCurrency}`);
+    });
+  }
+  updateAllPricesOnPage();
+}
+
+function updateAllPricesOnPage() {
+  // Update all product cards
+  document.querySelectorAll('.product-card').forEach(card => {
+    const btn = card.querySelector('.btn-add-cart');
+    const productId = btn?.dataset.productId;
+    const product = LuxeState.products.find(p => p.id === productId);
+    const priceEl = card.querySelector('.product-price');
+    if (product && priceEl) {
+      priceEl.textContent = window.formatCurrency(product.price);
+    }
+  });
+
+  // Update quickview if open
+  const qvPrice = document.querySelector('.quickview-price');
+  if (qvPrice && qvPrice.dataset.basePrice) {
+    qvPrice.textContent = window.formatCurrency(parseInt(qvPrice.dataset.basePrice, 10));
+  }
+}
+
+/* ==========================================================================
+   3. Wishlist / Favorites Engine
+   ========================================================================== */
+function initWishlistEngine() {
+  const wishlistToggleBtns = document.querySelectorAll('.wishlist-toggle-btn');
+  const wishlistOverlay = document.querySelector('.wishlist-overlay');
+  const wishlistDrawer = document.querySelector('.wishlist-drawer');
+  const wishlistCloseBtn = document.querySelector('.wishlist-close-btn');
+  const btnMoveAllToCart = document.getElementById('btnMoveAllToCart');
+
+  function openWishlist() {
+    wishlistOverlay?.classList.add('is-open');
+    if (wishlistOverlay) wishlistOverlay.style.opacity = '1';
+    if (wishlistOverlay) wishlistOverlay.style.pointerEvents = 'auto';
+    if (wishlistDrawer) wishlistDrawer.style.transform = 'translateX(0)';
+    document.body.style.overflow = 'hidden';
+    renderWishlistDrawer();
+  }
+
+  function closeWishlist() {
+    if (wishlistOverlay) wishlistOverlay.style.opacity = '0';
+    if (wishlistOverlay) wishlistOverlay.style.pointerEvents = 'none';
+    if (wishlistDrawer) wishlistDrawer.style.transform = 'translateX(100%)';
+    document.body.style.overflow = '';
+  }
+
+  wishlistToggleBtns.forEach(btn => btn.addEventListener('click', openWishlist));
+  wishlistCloseBtn?.addEventListener('click', closeWishlist);
+  wishlistOverlay?.addEventListener('click', closeWishlist);
+
+  btnMoveAllToCart?.addEventListener('click', () => {
+    if (LuxeState.wishlist.length === 0) return;
+    LuxeState.wishlist.forEach(id => {
+      const prod = LuxeState.products.find(p => p.id === id);
+      if (prod) {
+        window.addToCart({
+          id: prod.id,
+          name: prod.name,
+          price: prod.price,
+          finish: prod.finishes[0]?.name || 'Standard Finish',
+          image: prod.image,
+          qty: 1
+        });
+      }
+    });
+    LuxeState.wishlist = [];
+    localStorage.setItem('luxeliving_wishlist', JSON.stringify(LuxeState.wishlist));
+    updateWishlistBadge();
+    closeWishlist();
+    showToast('All wishlist pieces moved to your bag.');
+  });
+
+  // Attach wishlist heart buttons to product cards
+  document.querySelectorAll('.product-card').forEach(card => {
+    const btn = card.querySelector('.btn-add-cart');
+    const productId = btn?.dataset.productId;
+    const thumbWrap = card.querySelector('.product-thumb-wrap');
+    if (thumbWrap && productId && !thumbWrap.querySelector('.product-wishlist-btn')) {
+      const heartBtn = document.createElement('button');
+      heartBtn.className = 'product-wishlist-btn';
+      heartBtn.title = 'Add to Wishlist';
+      heartBtn.style.cssText = 'position: absolute; top: 14px; right: 14px; width: 36px; height: 36px; border-radius: 50%; background: rgba(17,17,17,0.7); backdrop-filter: blur(8px); border: 1px solid rgba(197,164,109,0.3); color: var(--color-ivory); display: flex; align-items: center; justify-content: center; z-index: 3; transition: all 0.2s ease; cursor: pointer;';
+      
+      const isFav = LuxeState.wishlist.includes(productId);
+      heartBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="${isFav ? '#C5A46D' : 'none'}" stroke="${isFav ? '#C5A46D' : 'currentColor'}" stroke-width="2">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+        </svg>
+      `;
+
+      heartBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleWishlist(productId, heartBtn);
+      });
+
+      thumbWrap.appendChild(heartBtn);
+    }
+  });
+
+  window.renderWishlistDrawer = renderWishlistDrawer;
+}
+
+function toggleWishlist(productId, btnEl) {
+  const idx = LuxeState.wishlist.indexOf(productId);
+  const prod = LuxeState.products.find(p => p.id === productId);
+
+  if (idx > -1) {
+    LuxeState.wishlist.splice(idx, 1);
+    if (btnEl) {
+      btnEl.querySelector('svg').setAttribute('fill', 'none');
+      btnEl.querySelector('svg').setAttribute('stroke', 'currentColor');
+    }
+    showToast(`Removed from your wishlist.`);
+  } else {
+    LuxeState.wishlist.push(productId);
+    if (btnEl) {
+      btnEl.querySelector('svg').setAttribute('fill', '#C5A46D');
+      btnEl.querySelector('svg').setAttribute('stroke', '#C5A46D');
+    }
+    showToast(`${prod?.name || 'Item'} saved to your wishlist.`);
+  }
+
+  localStorage.setItem('luxeliving_wishlist', JSON.stringify(LuxeState.wishlist));
+  updateWishlistBadge();
+  if (window.renderWishlistDrawer) window.renderWishlistDrawer();
+}
+
+function updateWishlistBadge() {
+  const count = LuxeState.wishlist.length;
+  document.querySelectorAll('.wishlist-badge').forEach(badge => {
+    badge.textContent = count;
+    badge.style.display = count > 0 ? 'flex' : 'none';
+  });
+}
+
+function renderWishlistDrawer() {
+  const listEl = document.querySelector('.wishlist-items-list');
+  const emptyEl = document.querySelector('.wishlist-empty-state');
+  if (!listEl) return;
+
+  if (LuxeState.wishlist.length === 0) {
+    listEl.innerHTML = '';
+    if (emptyEl) emptyEl.style.display = 'block';
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  listEl.innerHTML = LuxeState.wishlist.map(id => {
+    const prod = LuxeState.products.find(p => p.id === id);
+    if (!prod) return '';
+    return `
+      <div class="cart-item" style="display: flex; gap: 16px; padding-bottom: 16px; border-bottom: 1px solid rgba(255,255,255,0.06);">
+        <img src="${prod.image}" alt="${prod.name}" style="width: 70px; height: 70px; border-radius: 4px; object-fit: cover; border: 1px solid rgba(197,164,109,0.2);">
+        <div style="flex-grow: 1;">
+          <h4 style="font-family: var(--font-serif); font-size: 1.05rem; color: var(--color-ivory); margin-bottom: 4px;">${prod.name}</h4>
+          <div style="font-size: 0.875rem; color: var(--color-gold); font-weight: 600; margin-bottom: 8px;">${window.formatCurrency(prod.price)}</div>
+          <div style="display: flex; gap: 12px; align-items: center;">
+            <button class="btn btn-primary" style="padding: 6px 12px; font-size: 0.6875rem;" onclick="addToCart({ id: '${prod.id}', name: '${prod.name}', price: ${prod.price}, finish: '${prod.finishes[0]?.name}', image: '${prod.image}', qty: 1 });">
+              Add to Bag
+            </button>
+            <button style="font-size: 0.6875rem; color: var(--color-taupe-light); text-transform: uppercase;" onclick="toggleWishlist('${prod.id}');">
+              Remove
+            </button>
+          </div>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+/* ==========================================================================
+   4. Command Palette & Instant Search (Cmd+K / Ctrl+K)
+   ========================================================================== */
+function initCommandPalette() {
+  const searchModal = document.getElementById('searchModal');
+  const searchTriggerBtn = document.getElementById('searchTriggerBtn');
+  const liveSearchInput = document.getElementById('liveSearchInput');
+  const searchResultsList = document.getElementById('searchResultsList');
+
+  function openSearch() {
+    searchModal?.classList.add('is-open');
+    document.body.style.overflow = 'hidden';
+    setTimeout(() => liveSearchInput?.focus(), 150);
+    renderSearchResults('');
+  }
+
+  function closeSearch() {
+    searchModal?.classList.remove('is-open');
+    document.body.style.overflow = '';
+  }
+
+  searchTriggerBtn?.addEventListener('click', openSearch);
+
+  // Keyboard shortcut Ctrl+K / Cmd+K
+  document.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      if (searchModal?.classList.contains('is-open')) closeSearch();
+      else openSearch();
+    }
+  });
+
+  liveSearchInput?.addEventListener('input', (e) => {
+    renderSearchResults(e.target.value.trim().toLowerCase());
+  });
+
+  function renderSearchResults(query) {
+    if (!searchResultsList) return;
+
+    const searchableItems = [
+      ...LuxeState.products.map(p => ({
+        type: 'Product',
+        title: p.name,
+        sub: `${p.category.toUpperCase()} • ${window.formatCurrency(p.price)}`,
+        link: `index.html#furniture`,
+        action: () => openQuickViewModal(p.id)
+      })),
+      { type: 'Service', title: 'Luxury Furniture Sales', sub: 'Flagship showroom & bespoke acquisitions', link: 'services.html#furniture-sales' },
+      { type: 'Service', title: 'Furniture Customisation', sub: 'Custom dimensions, fabrics & marbles', link: 'services.html#customisation' },
+      { type: 'Service', title: 'Interior Styling Advisory', sub: 'Room curation, lighting, and palette harmony', link: 'services.html#styling' },
+      { type: 'Service', title: 'Space Planning & 3D Layout', sub: 'Architectural scale drafting and floorplans', link: 'services.html#space-planning' },
+      { type: 'Service', title: 'White-Glove Delivery & Installation', sub: 'Climate-controlled freight and placement', link: 'services.html#delivery' },
+      { type: 'Tool', title: 'Interactive Bespoke Customizer', sub: 'Real-time 3D furniture customizer app', link: 'customizer.html' },
+      { type: 'Atelier', title: 'Madison Avenue Flagship Showroom', sub: '740 Madison Avenue, New York, NY 10065', link: 'contact.html' }
+    ];
+
+    const filtered = query === '' 
+      ? searchableItems.slice(0, 5) 
+      : searchableItems.filter(item => 
+          item.title.toLowerCase().includes(query) || 
+          item.sub.toLowerCase().includes(query) || 
+          item.type.toLowerCase().includes(query)
+        );
+
+    if (filtered.length === 0) {
+      searchResultsList.innerHTML = `
+        <div style="text-align: center; padding: 24px; color: var(--color-taupe-light);">
+          No matching furniture or atelier services found for "${query}".
+        </div>
+      `;
+      return;
+    }
+
+    searchResultsList.innerHTML = filtered.map(item => `
+      <div class="search-result-row" style="padding: 12px 16px; border: 1px solid rgba(255,255,255,0.08); border-radius: 4px; background: rgba(255,255,255,0.02); display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: all 0.2s ease;">
+        <div>
+          <span style="font-size: 0.65rem; letter-spacing: 0.16em; text-transform: uppercase; color: var(--color-gold); font-weight: 700;">${item.type}</span>
+          <div style="font-family: var(--font-serif); font-size: 1.1rem; color: var(--color-ivory);">${item.title}</div>
+          <div style="font-size: 0.75rem; color: var(--color-taupe-light);">${item.sub}</div>
+        </div>
+        <a href="${item.link}" class="btn-link-gold" style="font-size: 0.75rem;">View &rarr;</a>
+      </div>
+    `).join('');
+
+    searchResultsList.querySelectorAll('.search-result-row').forEach((row, i) => {
+      row.addEventListener('click', () => {
+        closeSearch();
+        if (filtered[i].action) filtered[i].action();
+        else window.location.href = filtered[i].link;
+      });
+    });
+  }
+}
+
+/* ==========================================================================
+   5. PWA Install Banner & App Prompt Engine
+   ========================================================================== */
+let deferredPrompt = null;
+function initPWAInstallPrompt() {
+  const pwaBanner = document.getElementById('pwaBanner');
+  const btnPwaAccept = document.getElementById('btnPwaAccept');
+  const btnPwaDismiss = document.getElementById('btnPwaDismiss');
+  const installBtns = document.querySelectorAll('.pwa-install-btn');
+
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault();
+    deferredPrompt = e;
+    if (pwaBanner) pwaBanner.style.display = 'flex';
+    installBtns.forEach(btn => btn.style.display = 'inline-flex');
+  });
+
+  btnPwaAccept?.addEventListener('click', async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      showToast('Luxe Living App installed successfully.');
+    }
+    deferredPrompt = null;
+    if (pwaBanner) pwaBanner.style.display = 'none';
+  });
+
+  btnPwaDismiss?.addEventListener('click', () => {
+    if (pwaBanner) pwaBanner.style.display = 'none';
+  });
+
+  installBtns.forEach(btn => {
+    btn.addEventListener('click', async () => {
+      if (deferredPrompt) {
+        deferredPrompt.prompt();
+        const { outcome } = await deferredPrompt.userChoice;
+        if (outcome === 'accepted') showToast('Luxe Living App installed.');
+        deferredPrompt = null;
+      } else {
+        showToast('App is ready. In Safari/Chrome, tap "Add to Home Screen".');
+      }
+    });
+  });
+}
+
+/* ==========================================================================
+   6. Offline Status Indicator
+   ========================================================================== */
+function initOfflineDetector() {
+  window.addEventListener('offline', () => {
+    showToast('Offline Mode Active. Cached collections & atelier remain accessible.');
+  });
+  window.addEventListener('online', () => {
+    showToast('Connection restored. Live atelier synchronization active.');
+  });
+}
 
 /* ==========================================================================
    Header & Mobile Navigation
@@ -177,7 +560,6 @@ function initHeader() {
   const toggleBtn = document.querySelector('.mobile-nav-toggle');
   const mobileDrawer = document.querySelector('.mobile-nav-drawer');
 
-  // Sticky blur on scroll
   window.addEventListener('scroll', () => {
     if (window.scrollY > 40) {
       header?.classList.add('is-scrolled');
@@ -186,7 +568,6 @@ function initHeader() {
     }
   }, { passive: true });
 
-  // Mobile menu toggle
   if (toggleBtn && mobileDrawer) {
     toggleBtn.addEventListener('click', () => {
       const isOpen = mobileDrawer.classList.toggle('is-open');
@@ -194,7 +575,6 @@ function initHeader() {
       document.body.style.overflow = isOpen ? 'hidden' : '';
     });
 
-    // Close mobile menu on link click
     mobileDrawer.querySelectorAll('.nav-link').forEach(link => {
       link.addEventListener('click', () => {
         mobileDrawer.classList.remove('is-open');
@@ -207,7 +587,6 @@ function initHeader() {
 
 /* ==========================================================================
    REVOLUTION SLIDER CONTROLLER
-   Layered Staggered Animations, Ken Burns, Timer Progress Bar, Touch Gestures
    ========================================================================== */
 function initHeroSlider() {
   const slider = document.querySelector('.hero-slider-section');
@@ -223,7 +602,7 @@ function initHeroSlider() {
   if (!slides.length) return;
 
   let currentIndex = 0;
-  const slideDuration = 7500; // 7.5 seconds
+  const slideDuration = 7500;
   let slideTimer = null;
   let progressStart = 0;
   let progressAnimFrame = null;
@@ -279,7 +658,6 @@ function initHeroSlider() {
     progressAnimFrame = requestAnimationFrame(updateProgress);
   }
 
-  // Event Listeners
   if (prevBtn) prevBtn.addEventListener('click', prevSlide);
   if (nextBtn) nextBtn.addEventListener('click', nextSlide);
 
@@ -287,11 +665,9 @@ function initHeroSlider() {
     dot.addEventListener('click', () => goToSlide(idx));
   });
 
-  // Pause on hover
   slider.addEventListener('mouseenter', () => { isPaused = true; });
   slider.addEventListener('mouseleave', () => { isPaused = false; });
 
-  // Touch swipe support
   let touchStartX = 0;
   let touchEndX = 0;
 
@@ -308,13 +684,11 @@ function initHeroSlider() {
     }
   }, { passive: true });
 
-  // Keyboard navigation
   document.addEventListener('keydown', (e) => {
     if (e.key === 'ArrowRight') nextSlide();
     if (e.key === 'ArrowLeft') prevSlide();
   });
 
-  // Start slider
   goToSlide(0);
 }
 
@@ -345,7 +719,7 @@ function initCollectionsAndFilter() {
 }
 
 /* ==========================================================================
-   Shopping Cart Engine (Drawer, Badge, LocalStorage, Concierge Checkout)
+   Shopping Cart Engine (Drawer, Badge, Currency Support)
    ========================================================================== */
 function initCartDrawer() {
   const cartToggleBtns = document.querySelectorAll('.cart-toggle-btn');
@@ -375,18 +749,16 @@ function initCartDrawer() {
   cartCloseBtn?.addEventListener('click', closeCart);
   cartOverlay?.addEventListener('click', closeCart);
 
-  // Expose global openCart
   window.openCartDrawer = openCart;
 
-  // Render items inside drawer
   function renderCart() {
     if (!cartItemsList) return;
 
     if (LuxeState.cart.length === 0) {
       cartItemsList.innerHTML = '';
       if (cartEmptyState) cartEmptyState.style.display = 'block';
-      if (subtotalEl) subtotalEl.textContent = '$0';
-      if (totalEl) totalEl.textContent = '$0';
+      if (subtotalEl) subtotalEl.textContent = window.formatCurrency(0);
+      if (totalEl) totalEl.textContent = window.formatCurrency(0);
       return;
     }
 
@@ -401,8 +773,8 @@ function initCartDrawer() {
           <img src="${item.image}" alt="${item.name}" class="cart-item-thumb" onerror="this.src='assets/images/showroom-reference.jpg'" />
           <div class="cart-item-info">
             <h4 class="cart-item-title">${item.name}</h4>
-            <div class="cart-item-variant">${item.finish || 'Standard Finish'}</div>
-            <div class="cart-item-price">$${item.price.toLocaleString()}</div>
+            <div class="cart-item-variant">${item.finish || 'Signature Finish'}</div>
+            <div class="cart-item-price">${window.formatCurrency(item.price)}</div>
             <div class="cart-item-controls">
               <div class="cart-qty-wrap">
                 <button class="cart-qty-btn qty-minus" onclick="updateCartItemQty(${index}, -1)">–</button>
@@ -416,18 +788,16 @@ function initCartDrawer() {
       `;
     }).join('');
 
-    if (subtotalEl) subtotalEl.textContent = `$${total.toLocaleString()}`;
-    if (totalEl) totalEl.textContent = `$${total.toLocaleString()}`;
+    if (subtotalEl) subtotalEl.textContent = window.formatCurrency(total);
+    if (totalEl) totalEl.textContent = window.formatCurrency(total);
     updateCartBadge();
   }
 
-  // Handle Checkout click -> open Concierge Checkout Integration Brief Modal
   checkoutBtn?.addEventListener('click', () => {
     closeCart();
     openCheckoutModal();
   });
 
-  // Global listeners for Add to Cart buttons
   document.querySelectorAll('.btn-add-cart').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -449,7 +819,6 @@ function initCartDrawer() {
   window.renderCartDrawer = renderCart;
 }
 
-// Global Cart Actions
 window.addToCart = function(item) {
   const existingIndex = LuxeState.cart.findIndex(i => i.id === item.id && i.finish === item.finish);
   if (existingIndex > -1) {
@@ -494,10 +863,9 @@ function updateCartBadge() {
 }
 
 /* ==========================================================================
-   Modals: Quick View, Consultation Booking, Checkout Pipeline
+   Modals: Quick View, Consultation Booking, Checkout
    ========================================================================== */
 function initModals() {
-  // Quick View triggers
   document.querySelectorAll('.product-quick-view-btn').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
@@ -506,7 +874,6 @@ function initModals() {
     });
   });
 
-  // Modal Backdrop Click to Close
   document.querySelectorAll('.modal-backdrop').forEach(modal => {
     modal.addEventListener('click', (e) => {
       if (e.target === modal) {
@@ -520,14 +887,12 @@ function initModals() {
     }
   });
 
-  // ESC key to close any open modal
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
       document.querySelectorAll('.modal-backdrop.is-open').forEach(closeModal);
     }
   });
 
-  // Global "Book Consultation" triggers
   document.querySelectorAll('.btn-book-consultation').forEach(btn => {
     btn.addEventListener('click', (e) => {
       e.preventDefault();
@@ -560,7 +925,11 @@ function openQuickViewModal(productId) {
 
   modal.querySelector('.quickview-title').textContent = product.name;
   modal.querySelector('.quickview-category').textContent = product.category.toUpperCase();
-  modal.querySelector('.quickview-price').textContent = `$${product.price.toLocaleString()}`;
+  
+  const priceEl = modal.querySelector('.quickview-price');
+  priceEl.dataset.basePrice = product.price;
+  priceEl.textContent = window.formatCurrency(product.price);
+  
   modal.querySelector('.quickview-desc').textContent = product.description;
   modal.querySelector('.quickview-dimensions').textContent = product.dimensions;
   modal.querySelector('.quickview-materials').textContent = product.materials;
@@ -569,7 +938,6 @@ function openQuickViewModal(productId) {
   imgEl.src = product.image;
   imgEl.onerror = () => { imgEl.src = 'assets/images/showroom-reference.jpg'; };
 
-  // Swatches
   const swatchesContainer = modal.querySelector('.quickview-swatches');
   if (swatchesContainer) {
     swatchesContainer.innerHTML = product.finishes.map((f, i) => `
@@ -591,7 +959,6 @@ function openQuickViewModal(productId) {
     modal.querySelector('.selected-finish-name').textContent = selectedFinish;
   }
 
-  // Add to Cart inside modal
   const addBtn = modal.querySelector('.quickview-add-cart-btn');
   addBtn.onclick = () => {
     addToCart({
@@ -634,23 +1001,21 @@ function openCheckoutModal() {
   const checkoutTotal = modal.querySelector('.checkout-total');
 
   if (checkoutItemsCount) checkoutItemsCount.textContent = `${LuxeState.cart.reduce((sum, item) => sum + item.qty, 0)} pieces`;
-  if (checkoutTotal) checkoutTotal.textContent = `$${total.toLocaleString()}`;
+  if (checkoutTotal) checkoutTotal.textContent = window.formatCurrency(total);
 
   openModal(modal);
 }
 
 /* ==========================================================================
-   Form Handling & Robust Validation
+   Form Handling & Validation
    ========================================================================== */
 function initForms() {
-  // Main Contact Form
   const contactForm = document.querySelector('#contactForm');
   if (contactForm) {
     contactForm.addEventListener('submit', (e) => {
       e.preventDefault();
       let isValid = true;
 
-      // Validate inputs
       const fields = [
         { id: 'contactName', test: val => val.trim().length >= 2, msg: 'Please provide your full name.' },
         { id: 'contactEmail', test: val => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(val), msg: 'Please provide a valid email address.' },
@@ -676,7 +1041,6 @@ function initForms() {
 
       if (!isValid) return;
 
-      // Simulate submission state
       const submitBtn = contactForm.querySelector('button[type="submit"]');
       const originalText = submitBtn.innerHTML;
       submitBtn.disabled = true;
@@ -687,7 +1051,6 @@ function initForms() {
         submitBtn.innerHTML = originalText;
         contactForm.reset();
 
-        // Show Confirmation Dialog
         const confirmModal = document.querySelector('#confirmationModal');
         if (confirmModal) {
           const refCode = 'LX-' + Math.floor(100000 + Math.random() * 900000);
@@ -700,7 +1063,6 @@ function initForms() {
     });
   }
 
-  // Booking Form Submission
   const bookingForm = document.querySelector('#bookingForm');
   if (bookingForm) {
     bookingForm.addEventListener('submit', (e) => {
@@ -719,7 +1081,6 @@ function initForms() {
     });
   }
 
-  // Newsletter Subscription Form
   document.querySelectorAll('.newsletter-form').forEach(form => {
     form.addEventListener('submit', (e) => {
       e.preventDefault();

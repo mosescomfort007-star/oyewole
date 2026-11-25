@@ -6,6 +6,10 @@
   <title>Contact Us — Luxe Living | Private Client Concierge</title>
   <meta name="description" content="Connect with the Luxe Living concierge for furniture acquisitions, custom furniture commissions, interior styling, and private showroom consultations.">
   <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0B3D2E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <link rel="stylesheet" href="assets/css/main.css">
 </head>
 <body class="bg-obsidian">
@@ -22,6 +26,7 @@
       <!-- Desktop Navigation -->
       <nav class="nav-menu" aria-label="Main Navigation">
         <a href="index.html" class="nav-link">Home</a>
+        <a href="customizer.html" class="nav-link">Bespoke Customizer</a>
         <a href="about.html" class="nav-link">About Us</a>
         <a href="services.html" class="nav-link">Our Services</a>
         <a href="contact.html" class="nav-link is-active">Contact Us</a>
@@ -29,6 +34,33 @@
 
       <!-- Header Actions -->
       <div class="header-actions">
+        <!-- Live Currency Switcher -->
+        <div class="currency-selector-wrap" style="position: relative;">
+          <select id="currencySelector" class="form-select" style="padding: 6px 12px; font-size: 0.75rem; border-color: rgba(197, 164, 109, 0.35); border-radius: var(--radius-full); cursor: pointer;" aria-label="Select Currency">
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="AED">AED (د.إ)</option>
+          </select>
+        </div>
+
+        <!-- Search Palette Trigger -->
+        <button class="search-toggle-btn" id="searchTriggerBtn" aria-label="Open Search Palette" title="Search Atelier (Ctrl+K)" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(197, 164, 109, 0.35); display: flex; align-items: center; justify-content: center; color: var(--color-ivory); background: rgba(17, 17, 17, 0.4);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+
+        <!-- Wishlist Trigger -->
+        <button class="wishlist-toggle-btn" aria-label="View Wishlist" title="Wishlist" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(197, 164, 109, 0.35); display: flex; align-items: center; justify-content: center; color: var(--color-ivory); background: rgba(17, 17, 17, 0.4);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+          <span class="wishlist-badge" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-gold); color: var(--color-obsidian); font-size: 0.65rem; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: none; align-items: center; justify-content: center;">0</span>
+        </button>
+
+        <!-- Cart Trigger -->
         <button class="cart-toggle-btn" aria-label="View Shopping Bag" title="Shopping Bag">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
@@ -407,6 +439,75 @@
       </form>
     </div>
   </div>
+
+  <!-- Universal Wishlist Drawer -->
+  <div class="wishlist-overlay" style="position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 1100; opacity: 0; pointer-events: none; transition: opacity var(--transition-normal);"></div>
+  <aside class="wishlist-drawer" style="position: fixed; top: 0; right: 0; width: 100%; max-width: 460px; height: 100%; background-color: var(--color-obsidian-card); border-left: 1px solid rgba(197, 164, 109, 0.3); z-index: 1110; transform: translateX(100%); transition: transform var(--transition-normal); display: flex; flex-direction: column;">
+    <div class="cart-header">
+      <h3 class="cart-title">Your Curated Wishlist</h3>
+      <button class="wishlist-close-btn" aria-label="Close Wishlist" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.1); color: var(--color-taupe-light); display: flex; align-items: center; justify-content: center; cursor: pointer;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="wishlist-body" style="padding: 24px; overflow-y: auto; flex-grow: 1;">
+      <div class="wishlist-items-list" style="display: flex; flex-direction: column; gap: 20px;"></div>
+      <div class="wishlist-empty-state" style="text-align: center; padding: 48px 16px; display: none;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; color: var(--color-taupe-light); opacity: 0.5;">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+        </svg>
+        <p style="color: var(--color-taupe-light);">Your wishlist is currently empty.</p>
+      </div>
+    </div>
+    <div class="cart-footer">
+      <button class="btn btn-primary" id="btnMoveAllToCart" style="width: 100%;">
+        Move All Items to Bag
+      </button>
+    </div>
+  </aside>
+
+  <!-- Live Command Palette / Search Modal -->
+  <div class="modal-backdrop" id="searchModal" role="dialog" aria-modal="true" aria-labelledby="searchModalTitle">
+    <div class="modal-dialog" style="max-width: 650px; padding: 32px;">
+      <button class="modal-close-btn" aria-label="Close search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <span class="eyebrow" id="searchModalTitle">Atelier Search &amp; Command Palette</span>
+      <div style="position: relative; margin-top: 12px; margin-bottom: 24px;">
+        <input type="text" id="liveSearchInput" class="form-input" placeholder="Search furniture, velvet, marble, lighting, or services..." style="padding-left: 48px; font-size: 1.05rem;" autofocus>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--color-gold);">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+      <div id="searchResultsList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Search Results rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom App Bar -->
+  <nav class="mobile-bottom-app-bar" aria-label="Mobile Navigation" style="position: fixed; bottom: 0; left: 0; width: 100%; height: 64px; background: rgba(17, 17, 17, 0.95); backdrop-filter: blur(16px); border-top: 1px solid rgba(197, 164, 109, 0.25); display: none; justify-content: space-around; align-items: center; z-index: 995;">
+    <a href="index.html" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      <span>Home</span>
+    </a>
+    <a href="index.html#furniture" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      <span>Catalog</span>
+    </a>
+    <a href="customizer.html" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+      <span>Custom</span>
+    </a>
+    <button class="wishlist-toggle-btn" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase; background: none; border: none; cursor: pointer;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+      <span>Wishlist</span>
+    </button>
+    <button class="cart-toggle-btn" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase; background: none; border: none; cursor: pointer;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line></svg>
+      <span>Bag</span>
+    </button>
+  </nav>
 
   <!-- Floating Helpers -->
   <button class="back-to-top" aria-label="Back to top">

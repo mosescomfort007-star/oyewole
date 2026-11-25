@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bespoke Furniture Customizer — Luxe Living Web App</title>
+  <meta name="description" content="Interactive 3D Bespoke Furniture Customizer. Personalize fabrics, Italian marbles, brushed brass finishes, and modular dimensions in real time.">
+  <link rel="icon" type="image/svg+xml" href="favicon.svg">
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0B3D2E">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <link rel="stylesheet" href="assets/css/main.css">
+  <style>
+    /* Dedicated Customizer Web App Layout */
+    .customizer-app-wrap {
+      display: grid;
+      grid-template-columns: 1.4fr 1fr;
+      gap: clamp(2rem, 4vw, 4rem);
+      align-items: start;
+      margin-top: 2rem;
+    }
+
+    .customizer-viewport {
+      position: sticky;
+      top: 100px;
+      background: radial-gradient(ellipse at 50% 50%, rgba(11, 61, 46, 0.3) 0%, rgba(20, 20, 20, 0.95) 75%);
+      border: 1px solid rgba(197, 164, 109, 0.3);
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      padding: clamp(1.5rem, 3vw, 2.5rem);
+      box-shadow: 0 25px 60px rgba(0, 0, 0, 0.7);
+    }
+
+    .viewport-canvas-container {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 16 / 11;
+      border-radius: var(--radius-xs);
+      overflow: hidden;
+      background-color: #151515;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .viewport-image {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: filter 0.5s ease, transform 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+
+    .viewport-overlay-tint {
+      position: absolute;
+      inset: 0;
+      mix-blend-mode: color;
+      pointer-events: none;
+      opacity: 0.35;
+      transition: background-color 0.4s ease, opacity 0.4s ease;
+    }
+
+    .viewport-badge-group {
+      position: absolute;
+      top: 16px;
+      left: 16px;
+      display: flex;
+      gap: 8px;
+      z-index: 5;
+    }
+
+    .viewport-controls-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 1.25rem;
+      padding-top: 1rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+      font-size: 0.8125rem;
+      color: var(--color-taupe-light);
+    }
+
+    .config-panel {
+      background-color: var(--color-obsidian-card);
+      border: 1px solid rgba(197, 164, 109, 0.25);
+      border-radius: var(--radius-sm);
+      padding: clamp(1.5rem, 3vw, 2.5rem);
+    }
+
+    .config-section {
+      margin-bottom: 2rem;
+      padding-bottom: 1.75rem;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+
+    .config-section:last-child {
+      margin-bottom: 0;
+      padding-bottom: 0;
+      border-bottom: none;
+    }
+
+    .config-label-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 12px;
+    }
+
+    .config-title {
+      font-family: var(--font-serif);
+      font-size: 1.25rem;
+      color: var(--color-ivory);
+    }
+
+    .config-value-badge {
+      font-size: 0.75rem;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: var(--color-gold);
+      font-weight: 600;
+    }
+
+    .model-selector-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }
+
+    .model-chip {
+      padding: 12px 10px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-xs);
+      background-color: rgba(255, 255, 255, 0.02);
+      color: var(--color-ivory);
+      text-align: center;
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .model-chip:hover, .model-chip.is-active {
+      border-color: var(--color-gold);
+      background-color: rgba(197, 164, 109, 0.1);
+    }
+
+    .model-chip.is-active {
+      box-shadow: 0 0 16px rgba(197, 164, 109, 0.2);
+    }
+
+    .model-chip-title {
+      font-family: var(--font-serif);
+      font-size: 0.95rem;
+      font-weight: 500;
+    }
+
+    .model-chip-price {
+      font-size: 0.75rem;
+      color: var(--color-gold);
+    }
+
+    .swatches-grid-lg {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 12px;
+    }
+
+    .swatch-card {
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-xs);
+      padding: 10px;
+      background-color: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      transition: all var(--transition-fast);
+      text-align: center;
+    }
+
+    .swatch-card:hover, .swatch-card.is-active {
+      border-color: var(--color-gold);
+      background-color: rgba(197, 164, 109, 0.12);
+    }
+
+    .swatch-card-preview {
+      width: 100%;
+      height: 44px;
+      border-radius: 2px;
+      margin-bottom: 6px;
+      border: 1px solid rgba(0, 0, 0, 0.2);
+    }
+
+    .swatch-card-title {
+      font-size: 0.6875rem;
+      font-weight: 600;
+      color: var(--color-ivory);
+      line-height: 1.2;
+    }
+
+    .swatch-card-sub {
+      font-size: 0.625rem;
+      color: var(--color-taupe-light);
+      margin-top: 2px;
+    }
+
+    .dimensions-pills {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .dimension-pill {
+      flex: 1;
+      padding: 12px 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: var(--radius-xs);
+      background-color: rgba(255, 255, 255, 0.02);
+      cursor: pointer;
+      text-align: center;
+      transition: all var(--transition-fast);
+    }
+
+    .dimension-pill:hover, .dimension-pill.is-active {
+      border-color: var(--color-gold);
+      background-color: rgba(197, 164, 109, 0.12);
+    }
+
+    .dimension-pill-name {
+      font-size: 0.8125rem;
+      font-weight: 600;
+      color: var(--color-ivory);
+      display: block;
+    }
+
+    .dimension-pill-spec {
+      font-size: 0.6875rem;
+      color: var(--color-taupe-light);
+      margin-top: 2px;
+      display: block;
+    }
+
+    .pricing-summary-box {
+      background: linear-gradient(135deg, rgba(11, 61, 46, 0.4) 0%, rgba(17, 17, 17, 0.9) 100%);
+      border: 1px solid var(--color-gold);
+      border-radius: var(--radius-xs);
+      padding: 24px;
+      margin-top: 2rem;
+    }
+
+    .pricing-summary-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 8px;
+      font-size: 0.875rem;
+      color: var(--color-taupe-light);
+    }
+
+    .pricing-total-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-top: 12px;
+      padding-top: 12px;
+      border-top: 1px solid rgba(197, 164, 109, 0.3);
+    }
+
+    .pricing-total-val {
+      font-family: var(--font-serif);
+      font-size: 2rem;
+      color: var(--color-gold);
+      font-weight: 500;
+    }
+
+    @media (max-width: 1024px) {
+      .customizer-app-wrap {
+        grid-template-columns: 1fr;
+      }
+      .customizer-viewport {
+        position: static;
+      }
+      .swatches-grid-lg {
+        grid-template-columns: repeat(2, 1fr);
+      }
+    }
+  </style>
+</head>
+<body class="bg-obsidian">
+
+  <!-- ========================================================================
+       Global Navigation Bar with App Extensions
+       ======================================================================== -->
+  <header class="site-header" id="siteHeader">
+    <div class="container header-inner">
+      <a href="index.html" class="brand-logo" aria-label="Luxe Living Home">
+        <img src="assets/images/logo.svg" alt="Luxe Living Logo" width="220" height="44">
+      </a>
+
+      <!-- Desktop Navigation -->
+      <nav class="nav-menu" aria-label="Main Navigation">
+        <a href="index.html" class="nav-link">Home</a>
+        <a href="customizer.html" class="nav-link is-active">Bespoke Customizer</a>
+        <a href="about.html" class="nav-link">About Us</a>
+        <a href="services.html" class="nav-link">Our Services</a>
+        <a href="contact.html" class="nav-link">Contact Us</a>
+      </nav>
+
+      <!-- Header Actions -->
+      <div class="header-actions">
+        <!-- Live Currency Switcher -->
+        <div class="currency-selector-wrap" style="position: relative;">
+          <select id="currencySelector" class="form-select" style="padding: 6px 12px; font-size: 0.75rem; border-color: rgba(197, 164, 109, 0.35); border-radius: var(--radius-full); cursor: pointer;" aria-label="Select Currency">
+            <option value="USD">USD ($)</option>
+            <option value="EUR">EUR (€)</option>
+            <option value="GBP">GBP (£)</option>
+            <option value="AED">AED (د.إ)</option>
+          </select>
+        </div>
+
+        <!-- Search Palette Trigger -->
+        <button class="search-toggle-btn" id="searchTriggerBtn" aria-label="Open Search Palette" title="Search Atelier (Ctrl+K)" style="width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(197, 164, 109, 0.35); display: flex; align-items: center; justify-content: center; color: var(--color-ivory); background: rgba(17, 17, 17, 0.4);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+
+        <!-- Wishlist Trigger -->
+        <button class="wishlist-toggle-btn" aria-label="View Wishlist" title="Wishlist" style="position: relative; width: 44px; height: 44px; border-radius: 50%; border: 1px solid rgba(197, 164, 109, 0.35); display: flex; align-items: center; justify-content: center; color: var(--color-ivory); background: rgba(17, 17, 17, 0.4);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+          </svg>
+          <span class="wishlist-badge" style="position: absolute; top: -3px; right: -3px; background-color: var(--color-gold); color: var(--color-obsidian); font-size: 0.65rem; font-weight: 700; min-width: 18px; height: 18px; border-radius: 9px; display: none; align-items: center; justify-content: center;">0</span>
+        </button>
+
+        <!-- Cart Trigger -->
+        <button class="cart-toggle-btn" aria-label="View Shopping Bag" title="Shopping Bag">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
+            <path d="M16 10a4 4 0 0 1-8 0"></path>
+          </svg>
+          <span class="cart-badge">1</span>
+        </button>
+
+        <!-- PWA Install Button (Dynamic) -->
+        <button class="btn btn-outline-gold pwa-install-btn" style="display: none; padding: 10px 16px; font-size: 0.75rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+          Install App
+        </button>
+
+        <button class="mobile-nav-toggle" aria-label="Toggle Navigation Menu">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Mobile Drawer Menu -->
+  <div class="mobile-nav-drawer" id="mobileDrawer">
+    <nav class="mobile-nav-links">
+      <a href="index.html" class="nav-link">Home</a>
+      <a href="customizer.html" class="nav-link is-active">Bespoke Customizer</a>
+      <a href="about.html" class="nav-link">About Us</a>
+      <a href="services.html" class="nav-link">Our Services</a>
+      <a href="contact.html" class="nav-link">Contact Us</a>
+    </nav>
+    <div style="display:flex; flex-direction:column; gap:16px; width:100%; max-width:280px;">
+      <button class="btn btn-primary btn-book-consultation" data-service="Bespoke Customizer Commission">
+        Book Consultation
+      </button>
+      <a href="https://wa.me/18005893548?text=Hello%20Luxe%20Living%2C%20I%20am%20using%20the%20Bespoke%20Customizer%20App." target="_blank" rel="noopener" class="btn btn-emerald">
+        WhatsApp Concierge
+      </a>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       CUSTOMIZER APPLICATION MAIN SECTION
+       ======================================================================== -->
+  <main class="section" style="padding-top: calc(var(--header-height) + 2rem); min-height: 100vh;">
+    <div class="container">
+      <div style="text-align: center; max-width: 780px; margin: 0 auto 3rem;">
+        <span class="eyebrow eyebrow-center">Interactive 3D Atelier App</span>
+        <h1 class="heading-display" style="font-size: clamp(2.2rem, 4.5vw, 3.8rem);">Bespoke Furniture Customizer</h1>
+        <p class="body-lead" style="margin-top: 1rem;">
+          Configure exceptional artisanal furniture in real time. Choose from loomed Italian velvets, book-matched marbles, and hand-rubbed brass patinas.
+        </p>
+      </div>
+
+      <div class="customizer-app-wrap">
+
+        <!-- Left: Interactive Visualizer Viewport -->
+        <div class="customizer-viewport">
+          <div class="viewport-canvas-container" id="visualizerCanvas">
+            <div class="viewport-badge-group">
+              <span class="product-badge" id="activeModelBadge">Signature Piece</span>
+              <span style="background: rgba(17, 17, 17, 0.85); backdrop-filter: blur(8px); border: 1px solid var(--color-gold); color: var(--color-gold); font-size: 0.625rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; padding: 4px 8px; border-radius: 2px;">
+                Live 3D Render View
+              </span>
+            </div>
+
+            <!-- Photorealistic Model Image Layer -->
+            <img src="assets/images/hero-slide-1.jpg" alt="Customizer Visualizer" class="viewport-image" id="activeModelImage">
+            
+            <!-- Dynamic Fabric/Marble Subtle Tint Layer -->
+            <div class="viewport-overlay-tint" id="viewportTint" style="background-color: #0B3D2E;"></div>
+          </div>
+
+          <div class="viewport-controls-bar">
+            <div>
+              <strong id="activeModelName" style="color: var(--color-ivory); font-family: var(--font-serif); font-size: 1.15rem; display: block;">The Aurelia Velvet Sectional</strong>
+              <span id="activeSpecSummary" style="font-size: 0.75rem; color: var(--color-gold);">Emerald Velvet &bull; Brushed Champagne Brass &bull; 340cm</span>
+            </div>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn btn-outline-gold" id="btnDownloadSpec" style="padding: 8px 14px; font-size: 0.6875rem;" title="Download Specification Dossier">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                Export Spec
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Right: Real-Time Configuration Controls -->
+        <div class="config-panel">
+
+          <!-- 1. Select Furniture Silhouette -->
+          <div class="config-section">
+            <div class="config-label-row">
+              <h3 class="config-title">1. Select Silhouette</h3>
+              <span class="config-value-badge" id="labelSelectedModel">Sectional</span>
+            </div>
+            <div class="model-selector-grid">
+              <div class="model-chip is-active" data-model="aurelia-sectional" data-base-price="7850" data-img="assets/images/hero-slide-1.jpg" data-badge="Signature Piece">
+                <span class="model-chip-title">Aurelia</span>
+                <span class="model-chip-price">$7,850</span>
+              </div>
+              <div class="model-chip" data-model="sovereign-table" data-base-price="6400" data-img="assets/images/hero-slide-2.jpg" data-badge="Artisanal Marble">
+                <span class="model-chip-title">Sovereign</span>
+                <span class="model-chip-price">$6,400</span>
+              </div>
+              <div class="model-chip" data-model="palazzo-bed" data-base-price="5600" data-img="assets/images/hero-slide-3.jpg" data-badge="Bespoke Order">
+                <span class="model-chip-title">Palazzo</span>
+                <span class="model-chip-price">$5,600</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. Primary Upholstery / Natural Stone -->
+          <div class="config-section">
+            <div class="config-label-row">
+              <h3 class="config-title">2. Material &amp; Tone</h3>
+              <span class="config-value-badge" id="labelSelectedMaterial">Deep Emerald Velvet</span>
+            </div>
+            <div class="swatches-grid-lg">
+              <div class="swatch-card is-active" data-material="Deep Emerald Velvet" data-color="#0B3D2E" data-surcharge="0">
+                <div class="swatch-card-preview" style="background-color: #0B3D2E;"></div>
+                <div class="swatch-card-title">Emerald</div>
+                <div class="swatch-card-sub">Velvet (Included)</div>
+              </div>
+              <div class="swatch-card" data-material="Obsidian Silk-Velvet" data-color="#141414" data-surcharge="450">
+                <div class="swatch-card-preview" style="background-color: #141414;"></div>
+                <div class="swatch-card-title">Obsidian</div>
+                <div class="swatch-card-sub">Silk (+$450)</div>
+              </div>
+              <div class="swatch-card" data-material="Warm Ivory Bouclé" data-color="#F4EFE6" data-surcharge="350">
+                <div class="swatch-card-preview" style="background-color: #F4EFE6;"></div>
+                <div class="swatch-card-title">Ivory</div>
+                <div class="swatch-card-sub">Bouclé (+$350)</div>
+              </div>
+              <div class="swatch-card" data-material="Calacatta Viola Stone" data-color="#582B35" data-surcharge="800">
+                <div class="swatch-card-preview" style="background: radial-gradient(circle, #EBE6DF 30%, #582B35 100%);"></div>
+                <div class="swatch-card-title">Calacatta</div>
+                <div class="swatch-card-sub">Marble (+$800)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. Hardware & Plinth Finish -->
+          <div class="config-section">
+            <div class="config-label-row">
+              <h3 class="config-title">3. Plinth &amp; Joinery Metal</h3>
+              <span class="config-value-badge" id="labelSelectedMetal">Brushed Champagne Gold</span>
+            </div>
+            <div class="swatches-grid-lg">
+              <div class="swatch-card is-active" data-metal="Brushed Champagne Gold" data-surcharge="0">
+                <div class="swatch-card-preview" style="background: linear-gradient(135deg, #E5D1AA, #C5A46D, #9E7F47);"></div>
+                <div class="swatch-card-title">Champagne Gold</div>
+                <div class="swatch-card-sub">Satin (Included)</div>
+              </div>
+              <div class="swatch-card" data-metal="Antiqued Hand-Rubbed Bronze" data-surcharge="250">
+                <div class="swatch-card-preview" style="background: linear-gradient(135deg, #756B60, #4A433B, #2A241E);"></div>
+                <div class="swatch-card-title">Antique Bronze</div>
+                <div class="swatch-card-sub">Patina (+$250)</div>
+              </div>
+              <div class="swatch-card" data-metal="Smoked Obsidian Gunmetal" data-surcharge="300">
+                <div class="swatch-card-preview" style="background: linear-gradient(135deg, #3A3A3A, #1C1C1C, #111111);"></div>
+                <div class="swatch-card-title">Gunmetal</div>
+                <div class="swatch-card-sub">Anodized (+$300)</div>
+              </div>
+              <div class="swatch-card" data-metal="Polished Titanium Brass" data-surcharge="400">
+                <div class="swatch-card-preview" style="background: linear-gradient(135deg, #FFF3D6, #E0C695, #B38E46);"></div>
+                <div class="swatch-card-title">Titanium Brass</div>
+                <div class="swatch-card-sub">Mirror (+$400)</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 4. Dimensions & Modular Configuration -->
+          <div class="config-section">
+            <div class="config-label-row">
+              <h3 class="config-title">4. Proportions &amp; Scale</h3>
+              <span class="config-value-badge" id="labelSelectedDim">Grand Modular (340cm)</span>
+            </div>
+            <div class="dimensions-pills">
+              <div class="dimension-pill" data-dimension="Compact Salon (280cm)" data-surcharge="-500">
+                <span class="dimension-pill-name">Compact Salon</span>
+                <span class="dimension-pill-spec">W 280cm &bull; -$500</span>
+              </div>
+              <div class="dimension-pill is-active" data-dimension="Grand Modular (340cm)" data-surcharge="0">
+                <span class="dimension-pill-name">Grand Modular</span>
+                <span class="dimension-pill-spec">W 340cm &bull; Standard</span>
+              </div>
+              <div class="dimension-pill" data-dimension="Penthouse Curated (420cm)" data-surcharge="1200">
+                <span class="dimension-pill-name">Penthouse Curated</span>
+                <span class="dimension-pill-spec">W 420cm &bull; +$1,200</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Dynamic Pricing Box & Action Buttons -->
+          <div class="pricing-summary-box">
+            <div class="pricing-summary-row">
+              <span>Base Silhouette Price</span>
+              <span id="priceBaseVal">$7,850</span>
+            </div>
+            <div class="pricing-summary-row">
+              <span>Bespoke Materials &amp; Finish</span>
+              <span id="priceMaterialVal">$0</span>
+            </div>
+            <div class="pricing-summary-row">
+              <span>Scale &amp; Modular Dimension</span>
+              <span id="priceScaleVal">$0</span>
+            </div>
+            <div class="pricing-total-row">
+              <div>
+                <strong style="color: var(--color-ivory); font-family: var(--font-serif); font-size: 1.15rem; display: block;">Total Commission Estimate</strong>
+                <span style="font-size: 0.75rem; color: var(--color-taupe-light);">Includes white-glove delivery &amp; placement</span>
+              </div>
+              <div class="pricing-total-val" id="priceTotalVal">$7,850</div>
+            </div>
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.3fr 1fr; gap: 12px; margin-top: 1.5rem;">
+            <button class="btn btn-primary" id="btnCustomAddBag" style="padding: 16px;">
+              Add Custom Commission to Bag
+            </button>
+            <button class="btn btn-outline-gold btn-book-consultation" data-service="Bespoke Customizer Commission" style="padding: 16px;">
+              Review with Designer
+            </button>
+          </div>
+
+        </div>
+
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================================
+       MODAL: SPECIFICATION DOSSIER DOWNLOAD
+       ======================================================================== -->
+  <div class="modal-backdrop" id="dossierModal" role="dialog" aria-modal="true" aria-labelledby="modalDossierTitle">
+    <div class="modal-dialog" style="max-width: 620px; padding: 40px;">
+      <button class="modal-close-btn" aria-label="Close modal">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+
+      <div style="width: 54px; height: 54px; border-radius: 50%; background-color: var(--color-emerald-subtle); border: 1px solid var(--color-gold); display: flex; align-items: center; justify-content: center; color: var(--color-gold); margin-bottom: 20px;">
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+      </div>
+
+      <span class="eyebrow">Atelier Specification Dossier</span>
+      <h3 class="heading-md" id="modalDossierTitle" style="margin-bottom: 12px;">Custom Piece Specification</h3>
+      
+      <div id="dossierContent" style="background-color: rgba(255, 255, 255, 0.03); border: 1px solid rgba(197, 164, 109, 0.25); border-radius: 4px; padding: 20px; font-size: 0.875rem; line-height: 1.8; margin-bottom: 24px;">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <div style="display: flex; gap: 12px;">
+        <button class="btn btn-primary" onclick="window.print();" style="flex: 1;">
+          Print / Save PDF
+        </button>
+        <button class="btn btn-outline-gold" onclick="closeModal(document.querySelector('#dossierModal'));">
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Universal Shopping Cart Drawer -->
+  <div class="cart-overlay"></div>
+  <aside class="cart-drawer" aria-label="Shopping Bag">
+    <div class="cart-header">
+      <h3 class="cart-title">Your Curated Bag</h3>
+      <button class="cart-close-btn" aria-label="Close Shopping Bag">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="cart-body">
+      <div class="cart-items-list"></div>
+      <div class="cart-empty-state" style="display: none;">
+        <p style="color: var(--color-taupe-light); text-align: center; padding: 2rem 0;">Your shopping bag is currently empty.</p>
+      </div>
+    </div>
+    <div class="cart-footer">
+      <div class="cart-subtotal-row"><span>Subtotal</span><span class="cart-subtotal-val">$7,850</span></div>
+      <div class="cart-total-row"><span>Estimated Total</span><span class="cart-total-val text-gold">$7,850</span></div>
+      <button class="btn btn-primary cart-checkout-btn" style="width: 100%;">Proceed to Concierge Checkout</button>
+    </div>
+  </aside>
+
+  <!-- Universal Wishlist Drawer -->
+  <div class="wishlist-overlay" style="position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75); backdrop-filter: blur(8px); z-index: 1100; opacity: 0; pointer-events: none; transition: opacity var(--transition-normal);"></div>
+  <aside class="wishlist-drawer" style="position: fixed; top: 0; right: 0; width: 100%; max-width: 460px; height: 100%; background-color: var(--color-obsidian-card); border-left: 1px solid rgba(197, 164, 109, 0.3); z-index: 1110; transform: translateX(100%); transition: transform var(--transition-normal); display: flex; flex-direction: column;">
+    <div class="cart-header">
+      <h3 class="cart-title">Your Curated Wishlist</h3>
+      <button class="wishlist-close-btn" aria-label="Close Wishlist" style="width: 36px; height: 36px; border-radius: 50%; border: 1px solid rgba(255, 255, 255, 0.1); color: var(--color-taupe-light); display: flex; align-items: center; justify-content: center;">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+    </div>
+    <div class="wishlist-body" style="padding: 24px; overflow-y: auto; flex-grow: 1;">
+      <div class="wishlist-items-list" style="display: flex; flex-direction: column; gap: 20px;"></div>
+      <div class="wishlist-empty-state" style="text-align: center; padding: 48px 16px; display: none;">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="margin: 0 auto 16px; color: var(--color-taupe-light); opacity: 0.5;">
+          <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+        </svg>
+        <p style="color: var(--color-taupe-light);">Your wishlist is currently empty.</p>
+      </div>
+    </div>
+    <div class="cart-footer">
+      <button class="btn btn-primary" id="btnMoveAllToCart" style="width: 100%;">
+        Move All Items to Bag
+      </button>
+    </div>
+  </aside>
+
+  <!-- Live Command Palette / Search Modal -->
+  <div class="modal-backdrop" id="searchModal" role="dialog" aria-modal="true" aria-labelledby="searchModalTitle">
+    <div class="modal-dialog" style="max-width: 650px; padding: 32px;">
+      <button class="modal-close-btn" aria-label="Close search">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <span class="eyebrow" id="searchModalTitle">Atelier Search &amp; Command Palette</span>
+      <div style="position: relative; margin-top: 12px; margin-bottom: 24px;">
+        <input type="text" id="liveSearchInput" class="form-input" placeholder="Search furniture, velvet, marble, lighting, or services..." style="padding-left: 48px; font-size: 1.05rem;" autofocus>
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="position: absolute; left: 16px; top: 50%; transform: translateY(-50%); color: var(--color-gold);">
+          <circle cx="11" cy="11" r="8"></circle>
+          <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+        </svg>
+      </div>
+      <div id="searchResultsList" style="max-height: 380px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px;">
+        <!-- Search Results rendered by JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Universal VIP Consultation Booking Modal -->
+  <div class="modal-backdrop" id="bookingModal" role="dialog" aria-modal="true" aria-labelledby="modalBookingTitle">
+    <div class="modal-dialog" style="max-width: 600px; padding: 40px;">
+      <button class="modal-close-btn" aria-label="Close modal">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+      </button>
+      <span class="eyebrow">Private Client Services</span>
+      <h3 class="heading-md" id="modalBookingTitle" style="margin-bottom: 10px;">Reserve a VIP Consultation</h3>
+      <p style="color: var(--color-taupe-light); font-size: 0.875rem; margin-bottom: 24px;">Meet with a senior interior styling advisor in our Madison Avenue atelier or via virtual studio.</p>
+      <form id="bookingForm">
+        <div class="form-group">
+          <label class="form-label" for="bookingName">Your Name</label>
+          <input type="text" id="bookingName" class="form-input" required placeholder="Lady Eleanor Vance">
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="bookingEmail">Email Address</label>
+            <input type="email" id="bookingEmail" class="form-input" required placeholder="eleanor@estate.com">
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bookingPhone">Phone Number</label>
+            <input type="tel" id="bookingPhone" class="form-input" required placeholder="+1 (212) 555-0199">
+          </div>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+          <div class="form-group">
+            <label class="form-label" for="bookingService">Service Desired</label>
+            <select id="bookingService" class="form-select">
+              <option value="Bespoke Customizer Commission">Bespoke Customizer Commission</option>
+              <option value="Showroom Consultation">Flagship Showroom VIP Tour</option>
+              <option value="Interior Styling">Interior Styling &amp; Spatial Flow</option>
+              <option value="Virtual Consultation">Virtual Design Studio Session</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label class="form-label" for="bookingDate">Preferred Date</label>
+            <input type="date" id="bookingDate" class="form-input" required>
+          </div>
+        </div>
+        <button type="submit" class="btn btn-primary" style="width: 100%;">Confirm Reservation</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Mobile Bottom App Bar -->
+  <nav class="mobile-bottom-app-bar" aria-label="Mobile Navigation" style="position: fixed; bottom: 0; left: 0; width: 100%; height: 64px; background: rgba(17, 17, 17, 0.95); backdrop-filter: blur(16px); border-top: 1px solid rgba(197, 164, 109, 0.25); display: none; justify-content: space-around; align-items: center; z-index: 995;">
+    <a href="index.html" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path></svg>
+      <span>Home</span>
+    </a>
+    <a href="index.html#furniture" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+      <span>Catalog</span>
+    </a>
+    <a href="customizer.html" style="display: flex; flex-direction: column; align-items: center; color: var(--color-gold); font-size: 0.65rem; text-transform: uppercase; font-weight: 700;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path></svg>
+      <span>Custom</span>
+    </a>
+    <button class="wishlist-toggle-btn" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase; background: none; border: none; cursor: pointer;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
+      <span>Wishlist</span>
+    </button>
+    <button class="cart-toggle-btn" style="display: flex; flex-direction: column; align-items: center; color: var(--color-taupe-light); font-size: 0.65rem; text-transform: uppercase; background: none; border: none; cursor: pointer;">
+      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line></svg>
+      <span>Bag</span>
+    </button>
+  </nav>
+
+  <!-- PWA Install Floating Banner -->
+  <div id="pwaBanner" style="position: fixed; bottom: 80px; left: 24px; z-index: 1000; background: rgba(17, 17, 17, 0.95); backdrop-filter: blur(16px); border: 1px solid var(--color-gold); border-radius: var(--radius-sm); padding: 14px 20px; display: none; align-items: center; gap: 16px; box-shadow: 0 10px 30px rgba(0,0,0,0.6);">
+    <div>
+      <strong style="color: var(--color-ivory); font-size: 0.875rem; display: block;">Install Luxe Living App</strong>
+      <span style="color: var(--color-taupe-light); font-size: 0.75rem;">Add to your home screen for VIP atelier access.</span>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-primary" id="btnPwaAccept" style="padding: 6px 14px; font-size: 0.6875rem;">Install</button>
+      <button id="btnPwaDismiss" style="color: var(--color-taupe-light); font-size: 0.6875rem; cursor: pointer; padding: 6px;">Dismiss</button>
+    </div>
+  </div>
+
+  <div class="toast-container" aria-live="polite"></div>
+
+  <!-- Global App Script -->
+  <script src="assets/js/main.js"></script>
+
+  <!-- Dedicated Customizer App Controller -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      let currentModel = {
+        name: 'The Aurelia Velvet Sectional',
+        code: 'aurelia-sectional',
+        basePrice: 7850,
+        image: 'assets/images/hero-slide-1.jpg',
+        badge: 'Signature Piece'
+      };
+
+      let currentMaterial = {
+        name: 'Deep Emerald Velvet',
+        color: '#0B3D2E',
+        surcharge: 0
+      };
+
+      let currentMetal = {
+        name: 'Brushed Champagne Gold',
+        surcharge: 0
+      };
+
+      let currentDimension = {
+        name: 'Grand Modular (340cm)',
+        surcharge: 0
+      };
+
+      const modelChips = document.querySelectorAll('.model-chip');
+      const materialCards = document.querySelectorAll('.swatch-card[data-material]');
+      const metalCards = document.querySelectorAll('.swatch-card[data-metal]');
+      const dimensionPills = document.querySelectorAll('.dimension-pill');
+
+      const activeModelImage = document.getElementById('activeModelImage');
+      const activeModelBadge = document.getElementById('activeModelBadge');
+      const activeModelName = document.getElementById('activeModelName');
+      const activeSpecSummary = document.getElementById('activeSpecSummary');
+      const viewportTint = document.getElementById('viewportTint');
+
+      const labelSelectedModel = document.getElementById('labelSelectedModel');
+      const labelSelectedMaterial = document.getElementById('labelSelectedMaterial');
+      const labelSelectedMetal = document.getElementById('labelSelectedMetal');
+      const labelSelectedDim = document.getElementById('labelSelectedDim');
+
+      const priceBaseVal = document.getElementById('priceBaseVal');
+      const priceMaterialVal = document.getElementById('priceMaterialVal');
+      const priceScaleVal = document.getElementById('priceScaleVal');
+      const priceTotalVal = document.getElementById('priceTotalVal');
+
+      function calculateTotal() {
+        const total = currentModel.basePrice + currentMaterial.surcharge + currentMetal.surcharge + currentDimension.surcharge;
+        
+        if (window.formatCurrency) {
+          priceBaseVal.textContent = window.formatCurrency(currentModel.basePrice);
+          priceMaterialVal.textContent = window.formatCurrency(currentMaterial.surcharge);
+          priceScaleVal.textContent = (currentDimension.surcharge >= 0 ? '+' : '') + window.formatCurrency(currentDimension.surcharge);
+          priceTotalVal.textContent = window.formatCurrency(total);
+        } else {
+          priceBaseVal.textContent = `$${currentModel.basePrice.toLocaleString()}`;
+          priceMaterialVal.textContent = `+$${currentMaterial.surcharge.toLocaleString()}`;
+          priceScaleVal.textContent = `$${currentDimension.surcharge.toLocaleString()}`;
+          priceTotalVal.textContent = `$${total.toLocaleString()}`;
+        }
+
+        activeSpecSummary.textContent = `${currentMaterial.name} • ${currentMetal.name} • ${currentDimension.name}`;
+        return total;
+      }
+
+      // 1. Model switch
+      modelChips.forEach(chip => {
+        chip.addEventListener('click', () => {
+          modelChips.forEach(c => c.classList.remove('is-active'));
+          chip.classList.add('is-active');
+
+          currentModel.name = chip.querySelector('.model-chip-title').textContent;
+          currentModel.code = chip.dataset.model;
+          currentModel.basePrice = parseInt(chip.dataset.basePrice, 10);
+          currentModel.image = chip.dataset.img;
+          currentModel.badge = chip.dataset.badge;
+
+          activeModelImage.src = currentModel.image;
+          activeModelBadge.textContent = currentModel.badge;
+          activeModelName.textContent = currentModel.name;
+          labelSelectedModel.textContent = currentModel.name;
+
+          calculateTotal();
+        });
+      });
+
+      // 2. Material switch
+      materialCards.forEach(card => {
+        card.addEventListener('click', () => {
+          materialCards.forEach(c => c.classList.remove('is-active'));
+          card.classList.add('is-active');
+
+          currentMaterial.name = card.dataset.material;
+          currentMaterial.color = card.dataset.color;
+          currentMaterial.surcharge = parseInt(card.dataset.surcharge, 10);
+
+          labelSelectedMaterial.textContent = currentMaterial.name;
+          viewportTint.style.backgroundColor = currentMaterial.color;
+          viewportTint.style.opacity = currentMaterial.color === '#F4EFE6' ? '0.15' : '0.4';
+
+          calculateTotal();
+        });
+      });
+
+      // 3. Metal switch
+      metalCards.forEach(card => {
+        card.addEventListener('click', () => {
+          metalCards.forEach(c => c.classList.remove('is-active'));
+          card.classList.add('is-active');
+
+          currentMetal.name = card.dataset.metal;
+          currentMetal.surcharge = parseInt(card.dataset.surcharge, 10);
+          labelSelectedMetal.textContent = currentMetal.name;
+
+          calculateTotal();
+        });
+      });
+
+      // 4. Dimension switch
+      dimensionPills.forEach(pill => {
+        pill.addEventListener('click', () => {
+          dimensionPills.forEach(p => p.classList.remove('is-active'));
+          pill.classList.add('is-active');
+
+          currentDimension.name = pill.dataset.dimension;
+          currentDimension.surcharge = parseInt(pill.dataset.surcharge, 10);
+          labelSelectedDim.textContent = currentDimension.name;
+
+          calculateTotal();
+        });
+      });
+
+      // Add custom build to bag
+      document.getElementById('btnCustomAddBag').addEventListener('click', () => {
+        const total = calculateTotal();
+        window.addToCart({
+          id: `custom-${currentModel.code}-${Date.now()}`,
+          name: `${currentModel.name} (Bespoke Build)`,
+          price: total,
+          finish: `${currentMaterial.name} / ${currentMetal.name} (${currentDimension.name})`,
+          image: currentModel.image,
+          qty: 1
+        });
+      });
+
+      // Export spec dossier
+      document.getElementById('btnDownloadSpec').addEventListener('click', () => {
+        const total = calculateTotal();
+        const dossierContent = document.getElementById('dossierContent');
+        const code = 'DOSSIER-' + Math.floor(100000 + Math.random() * 900000);
+
+        dossierContent.innerHTML = `
+          <div style="display: flex; justify-content: space-between; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 12px; margin-bottom: 12px;">
+            <strong style="color: var(--color-gold);">Luxe Living Private Atelier</strong>
+            <span style="color: var(--color-taupe-light);">Ref: ${code}</span>
+          </div>
+          <div><strong>Model:</strong> ${currentModel.name}</div>
+          <div><strong>Upholstery/Surface:</strong> ${currentMaterial.name}</div>
+          <div><strong>Plinth &amp; Joinery:</strong> ${currentMetal.name}</div>
+          <div><strong>Dimension Spec:</strong> ${currentDimension.name}</div>
+          <div style="margin-top: 12px; padding-top: 12px; border-top: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between;">
+            <strong>Estimated Valuation:</strong>
+            <strong style="color: var(--color-gold); font-size: 1.1rem;">${window.formatCurrency ? window.formatCurrency(total) : '$' + total.toLocaleString()}</strong>
+          </div>
+        `;
+
+        const modal = document.getElementById('dossierModal');
+        modal.classList.add('is-open');
+        document.body.style.overflow = 'hidden';
+      });
+
+      calculateTotal();
+    });
+  </script>
+</body>
+</html>

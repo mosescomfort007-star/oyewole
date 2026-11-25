@@ -1,0 +1,49 @@
+{
+  "name": "Luxe Living — Haute Furniture & Interior Atelier",
+  "short_name": "Luxe Living",
+  "description": "Bespoke luxury furniture, Italian marbles, rich emerald velvets, and architectural interior styling.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#111111",
+  "theme_color": "#0B3D2E",
+  "categories": ["shopping", "lifestyle", "design"],
+  "icons": [
+    {
+      "src": "assets/images/app-icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/images/app-icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Bespoke Customizer",
+      "url": "./customizer.html",
+      "description": "Customize luxury furniture fabrics, marbles, and plinth metals."
+    },
+    {
+      "name": "Furniture Collections",
+      "url": "./index.html#collections",
+      "description": "Browse living, dining, and bedroom suites."
+    },
+    {
+      "name": "Book VIP Consultation",
+      "url": "./services.html#consultation",
+      "description": "Schedule a private consultation at our Madison Avenue Atelier."
+    }
+  ]
+}
